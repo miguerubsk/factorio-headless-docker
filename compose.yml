@@ -1,0 +1,58 @@
+services:
+  factorio-server:
+    container_name: factorio_advanced
+    build:
+      context: .
+      args:
+        # You can specify the version to download during build time
+        - FACTORIO_VERSION=1.1.110
+    
+    # Network configuration
+    ports:
+      - "34197:34197/udp" # Default Game Port
+      - "27015:27015/tcp" # RCON Port
+    
+    # Automatic restart policy
+    restart: unless-stopped
+
+    # Environment Variables - The "Triple Injector" System
+    environment:
+      # --- BASIC SERVER CONTROLS ---
+      - SAVE_NAME=heavy_industrial_complex
+      - PORT=34197
+      - RCON_ENABLED=true
+      - RCON_PASSWORD=secure_rcon_pass_2026
+      
+      # --- FACTORIO_CONF__ (server-settings.json) ---
+      # Reference: https://github.com/wube/factorio-data/blob/master/server-settings.example.json
+      - FACTORIO_CONF__name=Gemini Dockerized Server
+      - FACTORIO_CONF__description=Fully automated Factorio node running on Docker.
+      - FACTORIO_CONF__tags=["automated", "docker", "hardcore"]
+      - FACTORIO_CONF__max_players=10
+      - FACTORIO_CONF__visibility__public=true
+      - FACTORIO_CONF__visibility__lan=true
+      - FACTORIO_CONF__game_password=factory_must_grow
+      
+      # --- MAP_GEN__ (map-gen-settings.json) ---
+      # Reference: https://github.com/wube/factorio-data/blob/master/map-gen-settings.example.json
+      - MAP_GEN__terrain_segmentation=low
+      - MAP_GEN__water=high
+      - MAP_GEN__autoplace_controls__iron-ore__richness=2
+      - MAP_GEN__autoplace_controls__stone__size=0.5
+      - MAP_GEN__cliff_settings__enabled=false # Disables cliffs for easier building
+      
+      # --- MAP_SET__ (map-settings.json) ---
+      # Reference: https://github.com/wube/factorio-data/blob/master/map-settings.example.json
+      - MAP_SET__pollution__enabled=true
+      - MAP_SET__enemy_evolution__time_factor=0.000004
+      - MAP_SET__difficulty_settings__technology_price_multiplier=1
+      
+      # --- AUTHENTICATION (Required for Mod downloads / Public Listing) ---
+      - FACTORIO_CONF__username=${FACTORIO_USER:-}
+      - FACTORIO_CONF__token=${FACTORIO_TOKEN:-}
+
+    # Data Persistence
+    volumes:
+      - ./data/saves:/factorio/saves
+      - ./data/mods:/factorio/mods
+      - ./data/config:/factorio/config
