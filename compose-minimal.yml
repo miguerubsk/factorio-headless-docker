@@ -1,0 +1,9 @@
+services:
+  factorio:
+    container_name: factorio-server
+    image: miguerubsk/factorio-headless:latest
+    restart: unless-stopped
+    ports:
+      - "34197:34197/udp"
+    volumes:
+      - ./data:/factorio

@@ -4,6 +4,7 @@ services:
     image: miguerubsk/factorio-headless:2.0.13
     restart: unless-stopped
     
+    # Monitoring: Ensures the process is alive
     healthcheck:
       test: ["CMD", "pgrep", "factorio"]
       interval: 1m
@@ -13,32 +14,33 @@ services:
 
     ports:
       - "34197:34197/udp" # Game Port
-      - "27015:27015/tcp" # RCON Port (Optional)
+      - "27015:27015/tcp" # RCON Port
 
     environment:
-      # Basic Configuration
+      # --- Basic Configuration ---
       - SAVE_NAME=factory_world
       - RCON_ENABLED=true
       - RCON_PASSWORD=factorio_secure_pass
 
-      # Mod Portal Credentials (Required for Auto-Update)
-      - FACTORIO_USER=
-      - FACTORIO_TOKEN=
-      - MODS_AUTO_UPDATE=false
-      - MODS_UPDATE_SCHEDULE=04:00 # Simple HH:MM or Cron expression
+      # --- Autonomous Updates (Recommended) ---
+      - GAME_AUTO_UPDATE=true
+      - GAME_UPDATE_SCHEDULE=04:00 # Checks for new versions at 4 AM
+      - MODS_AUTO_UPDATE=true
+      - MODS_UPDATE_SCHEDULE=04:00 # Checks for mod updates at 4 AM
+      
+      # Required for Official Mod Portal updates
+      - FACTORIO_USER=your_username
+      - FACTORIO_TOKEN=your_service_token
 
-      # Game Server Auto-Update
-      - GAME_AUTO_UPDATE=false
-      - GAME_UPDATE_SCHEDULE=04:00 # Simple HH:MM or Cron expression
-
-      # Space Age DLC (Factorio 2.0+)
+      # --- Space Age DLC (Factorio 2.0+) ---
       - DLC_SPACE_AGE=true
       - DLC_QUALITY=true
       - DLC_ELEVATED_RAILS=true
 
-      # Dynamic Injector (Optional)
-      - FACTORIO_CONF__name=Factorio Headless Server
-      - FACTORIO_CONF__description=Simple and clean Factorio server running on Docker.
+      # --- Dynamic Settings Injector (Examples) ---
+      - FACTORIO_CONF__name=My Autonomous Factorio Server
+      - FACTORIO_CONF__description=Running Factorio 2.0 with Space Age and Auto-Updates.
+      - FACTORIO_CONF__max_players=10
       - FACTORIO_CONF__visibility__public=false
 
     volumes:

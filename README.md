@@ -31,6 +31,9 @@ A lightweight, secure, and fully autonomous Factorio Headless Server. Optimized 
 | `DLC_QUALITY` | `quality` | Adds quality tiers. |
 | `DLC_ELEVATED_RAILS` | `elevated-rails` | Adds ramps and multi-level rails. |
 
+> [!NOTE]
+> DLC features require **Factorio 2.0.0** or higher. If a lower version is detected, these variables will be ignored to prevent configuration errors.
+
 *Note: Enabling `DLC_SPACE_AGE` automatically forces `DLC_QUALITY` and `DLC_ELEVATED_RAILS` to `true`.*
 
 ---
