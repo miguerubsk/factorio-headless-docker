@@ -4,18 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       major_filter:
-        description: 'Major version to sync (e.g., 1.1 or 2.0)'
+        description: 'Major version (e.g., 1.0 or 1.1)'
         required: true
-        default: '2.0'
+        default: '1.0'
       limit:
-        description: 'Max number of versions to build'
+        description: 'Max number of versions'
         required: true
         default: '15'
 
-# ESTO ES VITAL PARA LOS RELEASES
 permissions:
   contents: write
-  packages: write
 
 jobs:
   find-missing:
@@ -27,24 +25,16 @@ jobs:
         id: official
         run: |
           DATA=$(curl -s https://updater.factorio.com/get-available-versions)
-          
+          # Extraemos versiones, filtramos por el prefijo, quitamos duplicados y ordenamos
           ALL=$(echo "$DATA" | jq -r '.["core-linux_headless64"] | .[] | (.to, .stable) | select(. != null)' | grep "^${{ github.event.inputs.major_filter }}" | sort -uV | jq -R . | jq -s -c .)
-          
-          echo "Versiones encontradas: $ALL"
-          
-          if [ "$ALL" == "[]" ] || [ -z "$ALL" ]; then
-            echo "Error: No se encontraron versiones para el filtro ${{ github.event.inputs.major_filter }}"
-            exit 1
-          fi
-          
           echo "all=$ALL" >> $GITHUB_OUTPUT
 
       - name: Get Docker Hub Tags
         id: dockerhub
         run: |
-          # Si el repo no existe, curl fallará. Usamos || echo para devolver un JSON vacío seguro.
+          # Usamos el nombre correcto del repositorio: factorio-headless-docker
           RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless-docker/tags/?page_size=100")
-          TAGS=$(echo "$RESPONSE" | jq -c '.results | map(.name) // []' || echo "[]")
+          TAGS=$(echo "$RESPONSE" | jq -c '[.results[].name] // []' || echo "[]")
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Compare and Limit
@@ -53,7 +43,7 @@ jobs:
           ALL='${{ steps.official.outputs.all }}'
           EXISTING='${{ steps.dockerhub.outputs.existing }}'
           LIMIT=${{ github.event.inputs.limit }}
-          # Usamos --argjson para pasar los datos de forma segura a jq
+          # Calculamos cuáles faltan y aplicamos el LÍMITE de 15 (o el que pongas en el input)
           MISSING=$(jq -c -n --argjson all "$ALL" --argjson ext "$EXISTING" \
             '$all | [ .[] | select(. as $v | $ext | index($v) | not) ] | .[0:'"$LIMIT"']')
           echo "missing=$MISSING" >> $GITHUB_OUTPUT
@@ -65,7 +55,7 @@ jobs:
     strategy:
       matrix:
         version: ${{ fromJson(needs.find-missing.outputs.missing_versions) }}
-      max-parallel: 3 # Bajamos a 3 para evitar bloqueos de rate limit en DockerHub
+      max-parallel: 3
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -82,20 +72,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Build and Push to DockerHub
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           build-args: FACTORIO_VERSION=${{ matrix.version }}
-          # Forzamos minúsculas en el nombre de usuario por si acaso
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless-docker:${{ matrix.version }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Create GitHub Release
+      - name: Export Image to Tarball
+        run: |
+          # Exportamos la versión AMD64 para el artifact de GitHub (es la más compatible)
+          docker buildx build --platform linux/amd64 \
+            --build-arg FACTORIO_VERSION=${{ matrix.version }} \
+            -t factorio-v${{ matrix.version }} \
+            --output type=docker,dest=factorio-v${{ matrix.version }}.tar .
+
+      - name: Create GitHub Release and Upload Artifact
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ matrix.version }}
           name: Factorio Headless v${{ matrix.version }}
-          body: "Bulk-sync multi-arch build for ${{ matrix.version }}"
-          generate_release_notes: true
+          body: "Multi-arch build (linux/amd64, linux/arm64) for version ${{ matrix.version }}"
+          files: factorio-v${{ matrix.version }}.tar
