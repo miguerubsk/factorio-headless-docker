@@ -26,12 +26,12 @@ jobs:
       - name: Get All Official Versions
         id: official
         run: |
-          # Descargamos los datos
           DATA=$(curl -s https://updater.factorio.com/get-available-versions)
           
-          ALL=$(echo "$DATA" | jq -c '[.["core-linux_headless64"][] | (.to, .stable)] | map(select(. != null)) | unique | .[]' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
+          ALL=$(echo "$DATA" | jq -r '.["core-linux_headless64"] | .[] | (.to, .stable) | select(. != null)' | grep "^${{ github.event.inputs.major_filter }}" | sort -uV | jq -R . | jq -s -c .)
           
-          # Si ALL sigue vacío, lanzamos un error para saberlo de inmediato
+          echo "Versiones encontradas: $ALL"
+          
           if [ "$ALL" == "[]" ] || [ -z "$ALL" ]; then
             echo "Error: No se encontraron versiones para el filtro ${{ github.event.inputs.major_filter }}"
             exit 1
