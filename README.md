@@ -5,7 +5,7 @@ A lightweight, secure, and fully configurable Factorio Headless Server container
 ## ✨ Features
 
 - **🛡️ Secure**: Runs as a non-root user (`factorio`, UID 845).
-- **📦 Multi-stage build**: Minimal final image size based on Debian Bookworm Slim.
+- **📦 Multi-stage build**: Minimal final image size based on Debian Bookworm Slim with all necessary dependencies (`libglib2.0-0`, etc.).
 - **💉 Triple Injector System**: Inject any setting into `server-settings.json`, `map-gen-settings.json`, or `map-settings.json` via environment variables.
 - **🗺️ Auto-generation**: Automatically creates a new world with your custom settings if no save file is found.
 - **🔌 RCON Ready**: Built-in support for remote administration.
@@ -86,6 +86,10 @@ You can override **any** property in the configuration files by using specific p
 **Examples:**
 - `FACTORIO_CONF__name="My Server"` sets the server name.
 - `MAP_SET__pollution__enabled=false` disables pollution.
+- `FACTORIO_CONF__visibility__public=true` enables public listing (requires `FACTORIO_USER` and `FACTORIO_TOKEN`).
+
+> [!IMPORTANT]
+> **Credential Auto-Injection**: `FACTORIO_USER` and `FACTORIO_TOKEN` are automatically injected into your `server-settings.json`. If these variables are missing, the server will **force** `visibility.public=false` to prevent crashes.
 
 ### 📦 Mod Management
 

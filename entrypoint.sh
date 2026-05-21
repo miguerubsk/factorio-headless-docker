@@ -53,13 +53,37 @@ apply_updates() {
 
 # --- 2. CONFIGURACIÓN INICIAL ---
 setup_server() {
+    echo "--- [DEBUG] Verificando estructura de archivos ---"
+    if [ ! -f "${CORE_PATH}/bin/x64/factorio" ]; then
+        echo "--- [ERROR] Binario de Factorio no encontrado en ${CORE_PATH}/bin/x64/factorio ---"
+        echo "Contenido de ${CORE_PATH}:"
+        ls -R "${CORE_PATH}" | head -n 20
+        exit 1
+    fi
+
     # Detectar versión actual
     VERSION=$("${CORE_PATH}/bin/x64/factorio" --version | head -n 1 | awk '{print $2}')
     echo "--- [INIT] Factorio versión $VERSION ---"
 
-    [ ! -f "$SETTINGS_JSON" ] && cp "${DATA_EXAMPLE}/server-settings.example.json" "$SETTINGS_JSON"
+    if [ ! -f "$SETTINGS_JSON" ]; then
+        cp "${DATA_EXAMPLE}/server-settings.example.json" "$SETTINGS_JSON"
+    fi
     [ ! -f "$MAP_GEN_JSON" ] && cp "${DATA_EXAMPLE}/map-gen-settings.example.json" "$MAP_GEN_JSON"
     [ ! -f "$MAP_SET_JSON" ] && cp "${DATA_EXAMPLE}/map-settings.example.json" "$MAP_SET_JSON"
+
+    # Auto-inyector de credenciales y seguridad de visibilidad
+    if [ -n "$FACTORIO_USER" ]; then
+        jq ".username = \"$FACTORIO_USER\"" "$SETTINGS_JSON" > "${SETTINGS_JSON}.tmp" && mv "${SETTINGS_JSON}.tmp" "$SETTINGS_JSON"
+    fi
+    if [ -n "$FACTORIO_TOKEN" ]; then
+        jq ".token = \"$FACTORIO_TOKEN\"" "$SETTINGS_JSON" > "${SETTINGS_JSON}.tmp" && mv "${SETTINGS_JSON}.tmp" "$SETTINGS_JSON"
+    fi
+
+    # Si no hay credenciales, forzamos public=false para evitar crash
+    if [ -z "$FACTORIO_USER" ] || [ -z "$FACTORIO_TOKEN" ]; then
+        echo "--- [CONFIG] Credenciales no detectadas. Forzando visibilidad pública a 'false' ---"
+        jq '.visibility.public = false' "$SETTINGS_JSON" > "${SETTINGS_JSON}.tmp" && mv "${SETTINGS_JSON}.tmp" "$SETTINGS_JSON"
+    fi
 
     env | grep -E "^(FACTORIO_CONF__|MAP_GEN__|MAP_SET__)" | while IFS='=' read -r env_key env_value; do
         prefix=$(echo "$env_key" | cut -d'_' -f1-2)"__"; target_file=""

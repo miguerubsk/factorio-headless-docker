@@ -24,31 +24,32 @@ FROM debian:bookworm-slim
 LABEL maintainer="miguerubsk"
 LABEL description="Factorio Headless Server - Lightweight, Secure & Flexible"
 
-# Instalamos solo lo mínimo indispensable
+# Instalamos dependencias necesarias (libglib2.0-0 suele ser requerida por el binario de factorio)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libc6 \
     libstdc++6 \
+    libglib2.0-0 \
     curl \
     wget \
     unzip \
     jq \
     ca-certificates \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Crear usuario 'factorio' (UID/GID 845 es arbitrario pero fijo)
+# Crear usuario 'factorio'
 RUN groupadd -g 845 factorio && \
     useradd -u 845 -g factorio -d /factorio -s /bin/bash factorio
 
 # Crear estructura de carpetas
-RUN mkdir -p /factorio/saves /factorio/mods /factorio/config /factorio/scenarios /factorio/core
+RUN mkdir -p /factorio/saves /factorio/mods /factorio/config /factorio/scenarios
 
 # Copiar el juego desde la etapa anterior
+# Nota: /tmp/factorio en el builder contiene la carpeta 'bin', 'data', etc.
 COPY --from=builder /tmp/factorio /factorio/core
 
-# Copiar y preparar el script de entrada
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && \
-    chown -R factorio:factorio /factorio
+# Asegurar permisos correctos
+RUN chown -R factorio:factorio /factorio
 
 # Variables de entorno por defecto
 ENV SAVE_NAME=factory_world \
@@ -64,5 +65,11 @@ USER factorio
 
 # Volumen para persistencia
 VOLUME ["/factorio/saves", "/factorio/mods", "/factorio/config"]
+
+COPY entrypoint.sh /entrypoint.sh
+# Volvemos a root temporalmente para asegurar que el script es ejecutable si se copió con otros permisos
+USER root
+RUN chmod +x /entrypoint.sh
+USER factorio
 
 ENTRYPOINT ["/entrypoint.sh"]
