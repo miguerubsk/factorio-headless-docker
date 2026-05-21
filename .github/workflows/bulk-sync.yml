@@ -26,9 +26,17 @@ jobs:
       - name: Get All Official Versions
         id: official
         run: |
+          # Descargamos los datos
           DATA=$(curl -s https://updater.factorio.com/get-available-versions)
-          # Mejoramos el filtrado para evitar nulos
-          ALL=$(echo "$DATA" | jq -c '.["core-linux_headless64"] | map(.to // .stable) | select(. != null) | unique | .[]' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
+          
+          ALL=$(echo "$DATA" | jq -c '[.["core-linux_headless64"][] | (.to, .stable)] | map(select(. != null)) | unique | .[]' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
+          
+          # Si ALL sigue vacío, lanzamos un error para saberlo de inmediato
+          if [ "$ALL" == "[]" ] || [ -z "$ALL" ]; then
+            echo "Error: No se encontraron versiones para el filtro ${{ github.event.inputs.major_filter }}"
+            exit 1
+          fi
+          
           echo "all=$ALL" >> $GITHUB_OUTPUT
 
       - name: Get Docker Hub Tags
