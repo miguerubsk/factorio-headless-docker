@@ -1,0 +1,63 @@
+name: Auto-Update Factorio Images
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Cada noche a las 2 AM
+  workflow_dispatch: # Permite ejecución manual
+
+jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      new_versions: ${{ steps.compare.outputs.new_versions }}
+    steps:
+      - name: Get Official Versions
+        id: official
+        run: |
+          # Obtenemos las últimas versiones estables de la API de Factorio
+          VERSIONS=$(curl -s https://updater.factorio.com/get-available-versions | jq -r '.["core-linux64"] | .[] | .to' | sort -V | tail -n 5 | jq -R . | jq -s -c .)
+          echo "official=$VERSIONS" >> $GITHUB_OUTPUT
+
+      - name: Get Docker Hub Tags
+        id: dockerhub
+        run: |
+          # Obtenemos los tags que ya existen en tu Docker Hub
+          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100" | jq -r '.results[].name' | jq -R . | jq -s -c .)
+          echo "existing=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Compare and Filter
+        id: compare
+        run: |
+          OFFICIAL='${{ steps.official.outputs.official }}'
+          EXISTING='${{ steps.dockerhub.outputs.existing }}'
+          # Filtramos solo las que NO existen en Docker Hub
+          NEW=$(echo $OFFICIAL | jq -c "[.[] | select(. as \$v | $(echo $EXISTING) | index(\$v) | not)]")
+          echo "new_versions=$NEW" >> $GITHUB_OUTPUT
+
+  build-new:
+    needs: check-versions
+    if: ${{ needs.check-versions.outputs.new_versions != '[]' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.check-versions.outputs.new_versions) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          build-args: FACTORIO_VERSION=${{ matrix.version }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
+          platforms: linux/amd64,linux/arm64
