@@ -43,7 +43,7 @@ jobs:
         id: dockerhub
         run: |
           # Si el repo no existe, curl fallará. Usamos || echo para devolver un JSON vacío seguro.
-          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100")
+          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless-docker/tags/?page_size=100")
           TAGS=$(echo "$RESPONSE" | jq -c '.results | map(.name) // []' || echo "[]")
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
