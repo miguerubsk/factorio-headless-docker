@@ -42,14 +42,13 @@ RUN groupadd -g 845 factorio && \
     useradd -u 845 -g factorio -d /factorio -s /bin/bash factorio
 
 # Crear estructura de carpetas
-RUN mkdir -p /factorio/saves /factorio/mods /factorio/config /factorio/scenarios
+RUN mkdir -p /factorio/saves /factorio/mods /factorio/config /factorio/scenarios /opt/factorio
 
 # Copiar el juego desde la etapa anterior
-# Nota: /tmp/factorio en el builder contiene la carpeta 'bin', 'data', etc.
-COPY --from=builder /tmp/factorio /factorio/core
+COPY --from=builder /tmp/factorio /opt/factorio
 
 # Asegurar permisos correctos
-RUN chown -R factorio:factorio /factorio
+RUN chown -R factorio:factorio /factorio /opt/factorio
 
 # Variables de entorno por defecto
 ENV SAVE_NAME=factory_world \

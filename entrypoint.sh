@@ -1,6 +1,6 @@
 #!/bin/bash
 # --- RUTAS ---
-FACTORIO_PATH="/factorio"; CORE_PATH="${FACTORIO_PATH}/core"; CONFIG_PATH="${FACTORIO_PATH}/config"; DATA_EXAMPLE="${CORE_PATH}/data"
+FACTORIO_PATH="/factorio"; CORE_PATH="/opt/factorio"; CONFIG_PATH="${FACTORIO_PATH}/config"; DATA_EXAMPLE="${CORE_PATH}/data"
 SETTINGS_JSON="${CONFIG_PATH}/server-settings.json"; MAP_GEN_JSON="${CONFIG_PATH}/map-gen-settings.json"; MAP_SET_JSON="${CONFIG_PATH}/map-settings.json"
 
 # --- 1. LÓGICA DE DETECCIÓN DE VERSIONES ---
