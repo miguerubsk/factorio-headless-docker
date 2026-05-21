@@ -8,7 +8,7 @@ on:
         required: true
         default: '2.0'
       limit:
-        description: 'Max number of versions to build in this run (to avoid GitHub limits)'
+        description: 'Max number of versions to build'
         required: true
         default: '15'
 
@@ -21,14 +21,15 @@ jobs:
       - name: Get All Official Versions
         id: official
         run: |
-          # Obtenemos TODAS las versiones estables que coincidan con el filtro
-          ALL=$(curl -s https://updater.factorio.com/get-available-versions | jq -r '.["core-linux64"] | .[] | .to' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
+          DATA=$(curl -s https://updater.factorio.com/get-available-versions)
+          ALL=$(echo "$DATA" | jq -r '.["core-linux_headless64"] | map(.to // .stable) | unique | .[]' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
           echo "all=$ALL" >> $GITHUB_OUTPUT
 
       - name: Get Docker Hub Tags
         id: dockerhub
         run: |
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100" | jq -r '.results[].name' | jq -R . | jq -s -c .)
+          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100")
+          TAGS=$(echo "$RESPONSE" | jq -r '.results[].name // empty' | jq -R . | jq -s -c . || echo "[]")
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Compare and Limit
@@ -36,20 +37,19 @@ jobs:
         run: |
           ALL='${{ steps.official.outputs.all }}'
           EXISTING='${{ steps.dockerhub.outputs.existing }}'
+          [ -z "$EXISTING" ] && EXISTING="[]"
           LIMIT=${{ github.event.inputs.limit }}
-          
-          # Encontramos las que faltan y aplicamos el límite
           MISSING=$(echo $ALL | jq -c "[.[] | select(. as \$v | $(echo $EXISTING) | index(\$v) | not)] | .[0:$LIMIT]")
           echo "missing=$MISSING" >> $GITHUB_OUTPUT
 
   build-bulk:
     needs: find-missing
-    if: ${{ needs.find-missing.outputs.missing_versions != '[]' }}
+    if: ${{ needs.find-missing.outputs.missing_versions != '[]' && needs.find-missing.outputs.missing_versions != '' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         version: ${{ fromJson(needs.find-missing.outputs.missing_versions) }}
-      max-parallel: 5 # No saturar los runners de GitHub
+      max-parallel: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,14 +70,11 @@ jobs:
           build-args: FACTORIO_VERSION=${{ matrix.version }}
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
           platforms: linux/amd64,linux/arm64
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ matrix.version }}
           name: Factorio Headless v${{ matrix.version }}
-          body: |
-            Autonomous multi-arch build for version ${{ matrix.version }}.
-            Image: `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
+          body: "Bulk-sync multi-arch build for ${{ matrix.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

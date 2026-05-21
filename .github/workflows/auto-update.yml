@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MAJOR_FILTER: '2.0|1.1' # Patrón de versiones a vigilar
+  MAJOR_FILTER: ${{ vars.MAJOR_FILTER || '2.0|1.1' }} 
 
 jobs:
   check-versions:
@@ -17,13 +17,17 @@ jobs:
       - name: Get Official Versions
         id: official
         run: |
-          VERSIONS=$(curl -s https://updater.factorio.com/get-available-versions | jq -r '.["core-linux64"] | .[] | .to' | grep -E "${{ env.MAJOR_FILTER }}" | sort -V | tail -n 5 | jq -R . | jq -s -c .)
+          # Obtenemos todas las versiones 'to' y la 'stable' actual
+          DATA=$(curl -s https://updater.factorio.com/get-available-versions)
+          VERSIONS=$(echo "$DATA" | jq -r '.["core-linux_headless64"] | map(.to // .stable) | unique | .[]' | grep -E "${{ env.MAJOR_FILTER }}" | sort -V | tail -n 5 | jq -R . | jq -s -c .)
           echo "official=$VERSIONS" >> $GITHUB_OUTPUT
 
       - name: Get Docker Hub Tags
         id: dockerhub
         run: |
-          TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100" | jq -r '.results[].name' | jq -R . | jq -s -c .)
+          # Manejamos el caso de que el repo no exista o esté vacío
+          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100")
+          TAGS=$(echo "$RESPONSE" | jq -r '.results[].name // empty' | jq -R . | jq -s -c . || echo "[]")
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Compare and Filter
@@ -31,12 +35,13 @@ jobs:
         run: |
           OFFICIAL='${{ steps.official.outputs.official }}'
           EXISTING='${{ steps.dockerhub.outputs.existing }}'
+          [ -z "$EXISTING" ] && EXISTING="[]"
           NEW=$(echo $OFFICIAL | jq -c "[.[] | select(. as \$v | $(echo $EXISTING) | index(\$v) | not)]")
           echo "new_versions=$NEW" >> $GITHUB_OUTPUT
 
   build-new:
     needs: check-versions
-    if: ${{ needs.check-versions.outputs.new_versions != '[]' }}
+    if: ${{ needs.check-versions.outputs.new_versions != '[]' && needs.check-versions.outputs.new_versions != '' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -61,14 +66,11 @@ jobs:
           build-args: FACTORIO_VERSION=${{ matrix.version }}
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
           platforms: linux/amd64,linux/arm64
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ matrix.version }}
           name: Factorio Headless v${{ matrix.version }}
-          body: |
-            Automated multi-arch release for Factorio ${{ matrix.version }}.
-            Docker: `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
+          body: "Automated multi-arch release for ${{ matrix.version }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
