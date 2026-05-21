@@ -56,23 +56,39 @@ jobs:
       matrix:
         version: ${{ fromJson(needs.find-missing.outputs.missing_versions) }}
       max-parallel: 3
+      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check version availability
+        id: check_version
+        run: |
+          STATUS=$(curl -sI -o /dev/null -w "%{http_code}" https://www.factorio.com/get-download/${{ matrix.version }}/headless/linux64)
+          if [ "$STATUS" != "200" ] && [ "$STATUS" != "302" ]; then
+            echo "Version ${{ matrix.version }} not found (HTTP $STATUS). Skipping."
+            echo "exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "exists=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up QEMU
+        if: steps.check_version.outputs.exists == 'true'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: steps.check_version.outputs.exists == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
+        if: steps.check_version.outputs.exists == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and Push to DockerHub
+        if: steps.check_version.outputs.exists == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -82,6 +98,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
 
       - name: Export Image to Tarball
+        if: steps.check_version.outputs.exists == 'true'
         run: |
           # Exportamos la versión AMD64 para el artifact de GitHub (es la más compatible)
           docker buildx build --platform linux/amd64 \
@@ -90,6 +107,7 @@ jobs:
             --output type=docker,dest=factorio-v${{ matrix.version }}.tar .
 
       - name: Create GitHub Release and Upload Artifact
+        if: steps.check_version.outputs.exists == 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ matrix.version }}
