@@ -1,24 +1,29 @@
-name: Auto-Update Factorio Images
+name: Bulk Sync Factorio History
 
 on:
-  schedule:
-    - cron: '0 2 * * *'
   workflow_dispatch:
-
-env:
-  MAJOR_FILTER: '2.0|1.1' # Patrón de versiones a vigilar
+    inputs:
+      major_filter:
+        description: 'Major version to sync (e.g., 1.1 or 2.0)'
+        required: true
+        default: '2.0'
+      limit:
+        description: 'Max number of versions to build in this run (to avoid GitHub limits)'
+        required: true
+        default: '15'
 
 jobs:
-  check-versions:
+  find-missing:
     runs-on: ubuntu-latest
     outputs:
-      new_versions: ${{ steps.compare.outputs.new_versions }}
+      missing_versions: ${{ steps.compare.outputs.missing }}
     steps:
-      - name: Get Official Versions
+      - name: Get All Official Versions
         id: official
         run: |
-          VERSIONS=$(curl -s https://updater.factorio.com/get-available-versions | jq -r '.["core-linux64"] | .[] | .to' | grep -E "${{ env.MAJOR_FILTER }}" | sort -V | tail -n 5 | jq -R . | jq -s -c .)
-          echo "official=$VERSIONS" >> $GITHUB_OUTPUT
+          # Obtenemos TODAS las versiones estables que coincidan con el filtro
+          ALL=$(curl -s https://updater.factorio.com/get-available-versions | jq -r '.["core-linux64"] | .[] | .to' | grep "^${{ github.event.inputs.major_filter }}" | sort -V | jq -R . | jq -s -c .)
+          echo "all=$ALL" >> $GITHUB_OUTPUT
 
       - name: Get Docker Hub Tags
         id: dockerhub
@@ -26,21 +31,25 @@ jobs:
           TAGS=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100" | jq -r '.results[].name' | jq -R . | jq -s -c .)
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
-      - name: Compare and Filter
+      - name: Compare and Limit
         id: compare
         run: |
-          OFFICIAL='${{ steps.official.outputs.official }}'
+          ALL='${{ steps.official.outputs.all }}'
           EXISTING='${{ steps.dockerhub.outputs.existing }}'
-          NEW=$(echo $OFFICIAL | jq -c "[.[] | select(. as \$v | $(echo $EXISTING) | index(\$v) | not)]")
-          echo "new_versions=$NEW" >> $GITHUB_OUTPUT
+          LIMIT=${{ github.event.inputs.limit }}
+          
+          # Encontramos las que faltan y aplicamos el límite
+          MISSING=$(echo $ALL | jq -c "[.[] | select(. as \$v | $(echo $EXISTING) | index(\$v) | not)] | .[0:$LIMIT]")
+          echo "missing=$MISSING" >> $GITHUB_OUTPUT
 
-  build-new:
-    needs: check-versions
-    if: ${{ needs.check-versions.outputs.new_versions != '[]' }}
+  build-bulk:
+    needs: find-missing
+    if: ${{ needs.find-missing.outputs.missing_versions != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ${{ fromJson(needs.check-versions.outputs.new_versions) }}
+        version: ${{ fromJson(needs.find-missing.outputs.missing_versions) }}
+      max-parallel: 5 # No saturar los runners de GitHub
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,7 +77,7 @@ jobs:
           tag_name: v${{ matrix.version }}
           name: Factorio Headless v${{ matrix.version }}
           body: |
-            Automated multi-arch release for Factorio ${{ matrix.version }}.
-            Docker: `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
+            Autonomous multi-arch build for version ${{ matrix.version }}.
+            Image: `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
