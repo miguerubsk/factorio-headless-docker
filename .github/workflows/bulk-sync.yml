@@ -89,7 +89,7 @@ jobs:
           push: true
           build-args: FACTORIO_VERSION=${{ matrix.version }}
           # Forzamos minúsculas en el nombre de usuario por si acaso
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless-docker:${{ matrix.version }}
           platforms: linux/amd64,linux/arm64
 
       - name: Create GitHub Release
