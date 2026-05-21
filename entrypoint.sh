@@ -60,7 +60,7 @@ setup_server() {
     [ ! -f "$SETTINGS_JSON" ] && cp "${DATA_EXAMPLE}/server-settings.example.json" "$SETTINGS_JSON"
     [ ! -f "$MAP_GEN_JSON" ] && cp "${DATA_EXAMPLE}/map-gen-settings.example.json" "$MAP_GEN_JSON"
     [ ! -f "$MAP_SET_JSON" ] && cp "${DATA_EXAMPLE}/map-settings.example.json" "$MAP_SET_JSON"
-    
+
     env | grep -E "^(FACTORIO_CONF__|MAP_GEN__|MAP_SET__)" | while IFS='=' read -r env_key env_value; do
         prefix=$(echo "$env_key" | cut -d'_' -f1-2)"__"; target_file=""
         [[ "$env_key" == FACTORIO_CONF__* ]] && target_file="$SETTINGS_JSON"
@@ -98,6 +98,35 @@ setup_server() {
         if [ "${DLC_SPACE_AGE,,}" = "true" ] || [ "${DLC_QUALITY,,}" = "true" ]; then
             echo "--- [WARNING] DLC variables ignored. Factorio $VERSION does not support Space Age DLC ---"
         fi
+    fi
+
+    # Gestión de Mods (Descarga de nuevos)
+    if [ -n "$FACTORIO_USER" ] && [ -n "$FACTORIO_TOKEN" ]; then
+        COMBINED_MODS=""
+        [ -n "$MODS_LIST" ] && COMBINED_MODS="${MODS_LIST//,/ }"
+        [ -f "/factorio/config/mods.txt" ] && COMBINED_MODS="$COMBINED_MODS $(cat "/factorio/config/mods.txt")"
+
+        for mod_entry in $COMBINED_MODS; do
+            [ -z "$mod_entry" ] && continue
+
+            # Extraer el slug del mod si es una URL (ej: https://mods.factorio.com/mod/FNEI -> FNEI)
+            mod=$(echo "$mod_entry" | sed -E 's|.*/mod/([^/]+).*|\1|' | xargs)
+
+            if ! ls "${MODS_DIR}/${mod}"_*.zip 1> /dev/null 2>&1; then
+                echo "--- [MODS] Procesando mod: $mod ---"
+                mod_info=$(curl -s "https://mods.factorio.com/api/mods/$mod/full")
+                # Intentar v2.0 para Space Age, si no v1.1
+                release=$(echo "$mod_info" | jq -r ".releases | map(select(.info_json.factorio_version | startswith(\"${VERSION%.*}\"))) | last")
+                [ "$release" = "null" ] && release=$(echo "$mod_info" | jq -r '.releases | last')
+
+                dl_url=$(echo "$release" | jq -r '.download_url')
+                file_name=$(echo "$release" | jq -r '.file_name')
+
+                if [ "$dl_url" != "null" ]; then
+                    curl -L -o "${MODS_DIR}/${file_name}" "https://mods.factorio.com${dl_url}?username=${FACTORIO_USER}&token=${FACTORIO_TOKEN}"
+                fi
+            fi
+        done
     fi
 
     for mod_zip in "${MODS_DIR}"/*.zip; do

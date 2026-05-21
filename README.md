@@ -1,110 +1,115 @@
 # Factorio Headless Docker 🚀
 
-A lightweight, secure, and fully autonomous Factorio Headless Server. Optimized for Factorio 2.0+ and Space Age DLC.
+A lightweight, secure, and fully configurable Factorio Headless Server containerized with Docker. Optimized for both quick deployment and advanced server management.
 
-## Features
+## ✨ Features
 
-- **Autonomous**: Self-updating game binary and mods without container restarts.
-- **Factorio 2.0+ Ready**: Full support for Space Age, Quality, and Elevated Rails DLCs.
-- **Smart Mod Manager**: Automatic downloads from the Official Portal, version checking, and auto-activation.
-- **Triple Injector**: Configure any game setting via environment variables.
-- **Secure**: Runs as a non-root user (`factorio`, UID 845).
-- **Healthchecked**: Built-in monitoring for service reliability.
+- **🛡️ Secure**: Runs as a non-root user (`factorio`, UID 845).
+- **📦 Multi-stage build**: Minimal final image size based on Debian Bookworm Slim.
+- **💉 Triple Injector System**: Inject any setting into `server-settings.json`, `map-gen-settings.json`, or `map-settings.json` via environment variables.
+- **🗺️ Auto-generation**: Automatically creates a new world with your custom settings if no save file is found.
+- **🔌 RCON Ready**: Built-in support for remote administration.
+- **💾 Persistence**: Clean volume mapping for saves, mods, and configs.
+- **🔄 Auto-Updates**: Can automatically update the game and mods on a schedule.
+- **🛸 DLC Support**: Ready for Factorio 2.0 and Space Age DLC.
+- **📦 Mod Manager**: Automatically downloads missing mods and keeps them updated.
 
 ---
 
-## Configuration
+## 🚀 Quick Start
 
-### Basic Variables
+### 1. Zero Complications (Recommended)
+If you just want a server running with default settings:
+
+```bash
+docker run -d \
+  --name factorio-server \
+  -p 34197:34197/udp \
+  -p 27015:27015/tcp \
+  -v $(pwd)/data:/factorio \
+  miguerubsk/factorio-headless:latest
+```
+
+### 2. Using Docker Compose
+Clone the repository and choose your path:
+
+#### **A. Standard (Fastest)**
+Uses the pre-built image from Docker Hub.
+```bash
+docker compose up -d
+```
+
+#### **B. Advanced (Custom Build)**
+Builds the image locally (useful for different architectures or custom versions).
+```bash
+docker compose -f compose-build.yml up --build -d
+```
+
+---
+
+## ⚙️ Configuration
+
+### Basic Environment Variables
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `SAVE_NAME` | Name of the save file | `factory_world` |
-| `PORT` | Internal game port (UDP) | `34197` |
+| `SAVE_NAME` | Name of the save file to create/load | `factory_world` |
+| `PORT` | Game port (UDP) | `34197` |
 | `RCON_ENABLED` | Enable RCON support | `false` |
 | `RCON_PORT` | RCON port (TCP) | `27015` |
 | `RCON_PASSWORD` | RCON password | `factorio_pass` |
 
-### Space Age DLC (Factorio 2.0+)
-| Variable | Mod Name | Description |
-|----------|----------|-------------|
-| `DLC_SPACE_AGE` | `space-age` | Main expansion content. |
-| `DLC_QUALITY` | `quality` | Adds quality tiers. |
-| `DLC_ELEVATED_RAILS` | `elevated-rails` | Adds ramps and multi-level rails. |
+### 🔄 Auto-Updates & Watchdog
 
-> [!NOTE]
-> DLC features require **Factorio 2.0.0** or higher. If a lower version is detected, these variables will be ignored to prevent configuration errors.
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `GAME_AUTO_UPDATE` | Enable automatic game updates | `false` |
+| `MODS_AUTO_UPDATE` | Enable automatic mod updates | `false` |
+| `GAME_UPDATE_SCHEDULE`| Cron expression or HH:MM for updates | `04:00` |
 
-*Note: Enabling `DLC_SPACE_AGE` automatically forces `DLC_QUALITY` and `DLC_ELEVATED_RAILS` to `true`.*
+### 🛸 Factorio 2.0 / Space Age DLC
 
----
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DLC_SPACE_AGE` | Enable Space Age DLC (v2.0+) | `false` |
+| `DLC_QUALITY` | Enable Quality DLC | `false` |
+| `DLC_ELEVATED_RAILS` | Enable Elevated Rails DLC | `false` |
 
-## Automated Updates & Maintenance
+### 🧠 The "Triple Injector" (Dynamic JSON)
 
-The container features an internal watchdog that manages updates without killing the container itself.
+You can override **any** property in the configuration files by using specific prefixes:
 
-### Game & Mod Updates
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `GAME_AUTO_UPDATE` | `false` | Enable automatic binary updates from factorio.com. |
-| `MODS_AUTO_UPDATE` | `false` | Enable automatic mod updates from the Official Portal. |
-| `GAME_UPDATE_SCHEDULE` | `04:00` | Schedule for game restart/update. |
-| `MODS_UPDATE_SCHEDULE` | `04:00` | Schedule for mod update check. |
-| `FACTORIO_USER` | (empty) | Your Factorio.com username (required for mods). |
-| `FACTORIO_TOKEN` | (empty) | Your Service Token (required for mods). |
+- `FACTORIO_CONF__` &rarr; Targets `server-settings.json`
+- `MAP_GEN__` &rarr; Targets `map-gen-settings.json`
+- `MAP_SET__` &rarr; Targets `map-settings.json`
 
-**Supported Schedules:**
-- **Simple (HH:MM):** `04:00`, `23:30`.
-- **Advanced (Cron):** `0 4 * * 1` (Every Monday at 4:00 AM).
+**Examples:**
+- `FACTORIO_CONF__name="My Server"` sets the server name.
+- `MAP_SET__pollution__enabled=false` disables pollution.
 
-**Smart Restart Logic:** At the scheduled time, the watchdog **first checks** for updates. 
-- If a new game version or mod update is found, the server saves and restarts internally to apply them.
-- If **no updates** are found, the server **remains online** to avoid unnecessary downtime for players.
+### 📦 Mod Management
 
----
+1.  **Credentials**: Set `FACTORIO_USER` and `FACTORIO_TOKEN` (required for downloads).
+2.  **Mod List**:
+    *   Set `MODS_LIST` (comma-separated list of mod names **or full Portal URLs**).
+    *   OR place a `mods.txt` in your `config` volume (one name or URL per line).
 
-## Mod Management
+**Example `MODS_LIST`:**
+`MODS_LIST=FNEI, https://mods.factorio.com/mod/Space-Age-Optimization`
 
-The volume `/factorio/mods` is used for all mod storage.
-
-1.  **Manual**: Drop `.zip` files into the folder. They will be auto-activated on boot.
-2.  **Portal**: Enabled mods are automatically checked for updates if `MODS_AUTO_UPDATE` is active.
-3.  **Automatic Cleanup**: When a mod is updated, the old version is automatically deleted to prevent conflicts.
+3.  **Auto-Enable**: The server automatically downloads missing mods, enables them, and keeps them updated.
 
 ---
 
-## Port Configuration & Remapping
+## 📁 Persistence
 
-### Option A: External Remapping (Recommended)
-Change only the host port. The game remains on 34197 internally.
-```yaml
-ports:
-  - "5000:34197/udp" # You connect via port 5000
-```
+All data is stored in the `/factorio` directory inside the container. To keep your progress, map these subdirectories:
 
-### Option B: Internal & External Change
-Use when using `network_mode: host` or for public server indexing.
-```yaml
-environment:
-  - PORT=5000
-ports:
-  - "5000:5000/udp"
-```
+- `./data/saves`: Your world `.zip` files.
+- `./data/mods`: Installed mods.
+- `./data/config`: Generated JSON settings.
 
 ---
 
-## Technical Details
-
-### Healthcheck
-The container monitors the Factorio process every minute.
-- **Interval**: 1m
-- **Retries**: 3
-- **Action**: Check if `factorio` process is running.
-
-### Persistence
-Map these directories to keep your data:
-- `/factorio/saves`: World files.
-- `/factorio/mods`: Mods and `mod-list.json`.
-- `/factorio/config`: Server settings and configs.
-
-## License
-MIT License.
+## 📄 License
+MIT License. See [LICENSE](LICENSE) for details.
