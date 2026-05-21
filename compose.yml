@@ -3,6 +3,13 @@ services:
     container_name: factorio-server
     image: miguerubsk/factorio-headless:2.0.13
     restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "pgrep", "factorio"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
     ports:
       - "34197:34197/udp" # Game Port
@@ -18,6 +25,11 @@ services:
       - FACTORIO_USER=
       - FACTORIO_TOKEN=
       - MODS_AUTO_UPDATE=false
+      - MODS_UPDATE_SCHEDULE=04:00 # Simple HH:MM or Cron expression
+
+      # Game Server Auto-Update
+      - GAME_AUTO_UPDATE=false
+      - GAME_UPDATE_SCHEDULE=04:00 # Simple HH:MM or Cron expression
 
       # Space Age DLC (Factorio 2.0+)
       - DLC_SPACE_AGE=true
