@@ -1,80 +1,95 @@
-# Factorio Headless Docker
+# Factorio Headless Docker 🚀
 
-A lightweight, flexible, and fully configurable Factorio Headless Server containerized with Docker. Optimized for performance and ease of use.
+A lightweight, secure, and fully configurable Factorio Headless Server containerized with Docker. Optimized for both quick deployment and advanced server management.
 
 ## Features
 
-- **Multi-stage build**: Optimized image size using Debian Bookworm Slim.
-- **Dynamic Configuration**: Inject any setting into `server-settings.json` via environment variables.
-- **Auto-generation**: Automatically creates a new map if no save file is found.
-- **RCON Support**: Built-in RCON management for remote administration.
-- **Persistence**: Easy volume mapping for saves, mods, and configuration files.
-- **Customizable**: Supports custom map generation and game settings.
+- **Secure**: Runs as a non-root user (`factorio`, UID 845).
+- **Multi-stage build**: Minimal final image size based on Debian Bookworm Slim.
+- **Triple Injector System**: Inject any setting into `server-settings.json`, `map-gen-settings.json`, or `map-settings.json` via environment variables.
+- **Auto-generation**: Automatically creates a new world with your custom settings if no save file is found.
+- **RCON Ready**: Built-in support for remote administration.
+- **Persistence**: Clean volume mapping for saves, mods, and configs.
+
+---
 
 ## Quick Start
 
-The easiest way to run the server is using Docker Compose.
+### 1. Zero Complications (Recommended)
+If you just want a server running with default settings:
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/miguerubsk/factorio-headless-docker.git
-   cd factorio-headless-docker
-   ```
+```bash
+docker run -d \
+  --name factorio-server \
+  -p 34197:34197/udp \
+  -p 27015:27015/tcp \
+  -v $(pwd)/data:/factorio \
+  miguerubsk/factorio-headless:1.1.110
+```
 
-2. **Start the server:**
-   ```bash
-   docker compose up -d
-   ```
+### 2. Using Docker Compose
+Clone the repository and choose your path:
 
-The server will be available on UDP port `34197`.
+#### **A. Standard (Fastest)**
+Uses the pre-built image from Docker Hub.
+```bash
+docker compose up -d
+```
+
+#### **B. Advanced (Custom Build)**
+Builds the image locally (useful for different architectures or custom versions).
+```bash
+docker compose -f compose-build.yml up --build -d
+```
+
+---
 
 ## Configuration
 
-### Environment Variables
+### Basic Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SAVE_NAME` | Name of the save file to create/load | `factory_world` |
 | `PORT` | Game port (UDP) | `34197` |
-| `RCON_ENABLED` | Enable RCON | `false` |
+| `RCON_ENABLED` | Enable RCON support | `false` |
 | `RCON_PORT` | RCON port (TCP) | `27015` |
-| `RCON_PASSWORD` | RCON password | `factorio_default_pass` |
+| `RCON_PASSWORD` | RCON password | `factorio_pass` |
 
-### Dynamic JSON Injection (Advanced)
+### The "Triple Injector" (Dynamic JSON)
 
-You can override any property in `server-settings.json` by prefixing environment variables with `FACTORIO_CONF__`. Use `__` to represent nested paths.
+You can override **any** property in the configuration files by using specific prefixes:
 
-**Example:**
-- `FACTORIO_CONF__name="My Docker Server"` &rarr; Sets `.name` to `"My Docker Server"`
-- `FACTORIO_CONF__visibility__public=true` &rarr; Sets `.visibility.public` to `true`
-- `FACTORIO_CONF__tags='["docker", "game"]'` &rarr; Sets `.tags` to `["docker", "game"]`
+- `FACTORIO_CONF__` &rarr; Targets `server-settings.json`
+- `MAP_GEN__` &rarr; Targets `map-gen-settings.json`
+- `MAP_SET__` &rarr; Targets `map-settings.json`
 
-### Custom Map Settings
+Use `__` (double underscore) for nested JSON properties.
 
-Place your custom JSON files in the mapped `config` volume:
-- `map-gen-settings.json`
-- `map-settings.json`
+**Examples:**
+- `FACTORIO_CONF__name="My Server"` sets the server name.
+- `MAP_GEN__water=high` sets water frequency.
+- `MAP_SET__pollution__enabled=false` disables pollution.
+- `FACTORIO_CONF__tags='["docker", "hardcore"]'` (JSON arrays are supported).
 
-The entrypoint script will automatically detect and use them when generating a new world.
+---
 
-## Volumes & Persistence
+## Persistence
 
-To ensure your progress is saved, the following paths should be mapped to your host machine:
+All data is stored in the `/factorio` directory inside the container. To keep your progress, map these subdirectories:
 
-- `/factorio/saves`: World save files (`.zip`).
-- `/factorio/mods`: Game modifications.
-- `/factorio/config`: Configuration files (`server-settings.json`, etc.).
+- `./data/saves`: Your world `.zip` files.
+- `./data/mods`: Installed mods.
+- `./data/config`: Generated JSON settings (will be auto-filled on first run).
 
-In the default `compose.yml`, these are mapped to `./factorio_data/`.
+---
 
-## Building the Image
+## Local Development
 
-To build the image locally with a specific Factorio version:
-
+To build the image manually:
 ```bash
-docker build --build-arg FACTORIO_VERSION=1.1.110 -t factorio-headless:latest .
+docker build --build-arg FACTORIO_VERSION=1.1.110 -t factorio-headless:local .
 ```
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License. See [LICENSE](LICENSE) for details.
