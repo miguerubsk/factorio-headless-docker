@@ -2,7 +2,7 @@
 FROM debian:bookworm-slim AS builder
 
 # Parámetros de versión (Default a la última estable conocida)
-ARG FACTORIO_VERSION=1.1.110
+ARG FACTORIO_VERSION=2.0.13
 ARG ARCH=x64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libc6 \
     libstdc++6 \
     curl \
+    wget \
+    unzip \
     jq \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

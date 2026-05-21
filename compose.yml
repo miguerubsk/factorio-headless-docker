@@ -1,7 +1,7 @@
 services:
   factorio:
     container_name: factorio-server
-    image: miguerubsk/factorio-headless:1.1.110
+    image: miguerubsk/factorio-headless:2.0.13
     restart: unless-stopped
 
     ports:
@@ -13,6 +13,16 @@ services:
       - SAVE_NAME=factory_world
       - RCON_ENABLED=true
       - RCON_PASSWORD=factorio_secure_pass
+
+      # Mod Portal Credentials (Required for Auto-Update)
+      - FACTORIO_USER=
+      - FACTORIO_TOKEN=
+      - MODS_AUTO_UPDATE=false
+
+      # Space Age DLC (Factorio 2.0+)
+      - DLC_SPACE_AGE=true
+      - DLC_QUALITY=true
+      - DLC_ELEVATED_RAILS=true
 
       # Dynamic Injector (Optional)
       - FACTORIO_CONF__name=Factorio Headless Server

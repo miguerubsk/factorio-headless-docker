@@ -56,6 +56,80 @@ docker compose -f compose-build.yml up --build -d
 | `RCON_PORT` | RCON port (TCP) | `27015` |
 | `RCON_PASSWORD` | RCON password | `factorio_pass` |
 
+### Space Age DLC (Factorio 2.0+)
+
+The expansion is managed as a set of internal mods. You can toggle them using:
+
+| Variable | Mod Name | Description |
+|----------|----------|-------------|
+| `DLC_SPACE_AGE` | `space-age` | Main expansion content. |
+| `DLC_QUALITY` | `quality` | Adds quality tiers to items/machines. |
+| `DLC_ELEVATED_RAILS` | `elevated-rails` | Adds ramps and multi-level rails. |
+
+**Important Logic:**
+- **Standalone:** You can enable `DLC_QUALITY` or `DLC_ELEVATED_RAILS` independently without the full expansion.
+- **Dependencies:** If `DLC_SPACE_AGE` is set to `true`, the system will **automatically enable** both `quality` and `elevated-rails` regardless of their individual variables, as they are required for the expansion to run.
+
+---
+
+## Mod Management
+
+For maximum flexibility, mods are handled through the `/factorio/mods` volume.
+
+### 1. Manual Install
+Just drop your `.zip` mod files into the `./data/mods` folder on your host. The server will automatically detect them, extract their internal names, and enable them in `mod-list.json` on the next boot.
+
+### 2. Automated Downloads (`download-list.txt`)
+Create a file named `download-list.txt` inside your mods volume with one URL per line:
+```text
+https://github.com/user/mod1/releases/download/v1.0/mod1_1.0.0.zip
+https://example.com/mods/my-cool-mod.zip
+```
+The server will download these files automatically if they don't exist.
+
+### 3. Auto-Updates (Official Portal)
+To keep your mods up to date automatically from the [Factorio Mod Portal](https://mods.factorio.com/):
+
+1.  Set `MODS_AUTO_UPDATE=true`.
+2.  Provide your Factorio credentials via `FACTORIO_USER` and `FACTORIO_TOKEN` (get your token from your [Factorio profile settings](https://www.factorio.com/profile)).
+3.  On every boot, the server will:
+    *   Check all enabled mods in `mod-list.json`.
+    *   Query the official API for the latest version compatible with Factorio 2.0.
+    *   Download the new `.zip` and **delete the old version** automatically.
+
+### 4. Activation Control
+- New mods are **enabled by default**.
+- Use the **DLC Environment Variables** (see above) for quick toggling of official expansion content.
+- For granular control, manually edit the `mod-list.json` file inside the volume.
+
+---
+
+## Port Configuration & Remapping
+
+By default, Factorio uses port `34197/udp`. You can change this in two ways:
+
+### Option A: External Remapping (Recommended)
+Change only the host port in your `docker-compose.yml`. The game remains on the default port internally, and Docker handles the redirection.
+
+```yaml
+ports:
+  - "5000:34197/udp" # You connect via port 5000
+```
+- **Use when:** You simply want to avoid port conflicts on your host machine.
+
+### Option B: Internal & External Change
+Change the `PORT` environment variable and match it in the ports mapping.
+
+```yaml
+environment:
+  - PORT=5000
+ports:
+  - "5000:5000/udp"
+```
+- **Use when:** You are using `network_mode: host`, you want the internal logs to reflect the custom port, or you want the server to be correctly indexed in the public server list with that specific port.
+
+---
+
 ### The "Triple Injector" (Dynamic JSON)
 
 You can override **any** property in the configuration files by using specific prefixes:
