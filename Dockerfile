@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Descarga del binario oficial headless
 WORKDIR /tmp
-RUN curl -L https://www.factorio.com/get-download/${FACTORIO_VERSION}/headless/linux64 -o factorio.tar.xz \
+RUN curl -fL https://www.factorio.com/get-download/${FACTORIO_VERSION}/headless/linux64 -o factorio.tar.xz \
     && tar -xJf factorio.tar.xz \
     && rm factorio.tar.xz
 
