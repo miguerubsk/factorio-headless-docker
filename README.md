@@ -44,12 +44,18 @@ The container features an internal watchdog that manages updates without killing
 |----------|---------|-------------|
 | `GAME_AUTO_UPDATE` | `false` | Enable automatic binary updates from factorio.com. |
 | `MODS_AUTO_UPDATE` | `false` | Enable automatic mod updates from the Official Portal. |
-| `GAME_UPDATE_SCHEDULE` | `04:00` | Scheduled time for game update check (HH:MM). |
-| `MODS_UPDATE_SCHEDULE` | `04:00` | Scheduled time for mod update check (HH:MM). |
+| `GAME_UPDATE_SCHEDULE` | `04:00` | Schedule for game restart/update. |
+| `MODS_UPDATE_SCHEDULE` | `04:00` | Schedule for mod update check. |
 | `FACTORIO_USER` | (empty) | Your Factorio.com username (required for mods). |
 | `FACTORIO_TOKEN` | (empty) | Your Service Token (required for mods). |
 
-**How it works:** At the scheduled time, the server saves the game and closes the process. It performs the updates internally and restarts the game immediately. The container remains `Up` during the whole process.
+**Supported Schedules:**
+- **Simple (HH:MM):** `04:00`, `23:30`.
+- **Advanced (Cron):** `0 4 * * 1` (Every Monday at 4:00 AM).
+
+**Smart Restart Logic:** At the scheduled time, the watchdog **first checks** for updates. 
+- If a new game version or mod update is found, the server saves and restarts internally to apply them.
+- If **no updates** are found, the server **remains online** to avoid unnecessary downtime for players.
 
 ---
 
