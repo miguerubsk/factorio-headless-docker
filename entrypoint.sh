@@ -19,26 +19,28 @@ MAP_SET_JSON="${CONFIG_PATH}/map-settings.json"
 [ ! -f "$MAP_SET_JSON" ] && cp "${DATA_EXAMPLE}/map-settings.example.json" "$MAP_SET_JSON"
 
 # --- 2. FUNCIÓN DE INYECCIÓN ---
-# Arg 1: Prefijo de variable (ej: MAP_GEN__)
-# Arg 2: Archivo JSON destino
 apply_configs() {
     local prefix=$1
     local target_file=$2
     echo "--- [CONFIG] Procesando prefijo $prefix para $(basename "$target_file") ---"
-    
-    for var in $(env | grep "^${prefix}"); do
-        key_full=$(echo "$var" | cut -d '=' -f 1 | sed "s/^${prefix}//")
-        value=$(echo "$var" | cut -d '=' -f 2)
+
+    # Usamos while read para evitar problemas con espacios o caracteres especiales
+    env | grep "^${prefix}" | while IFS='=' read -r env_key env_value; do
+        key_full=$(echo "$env_key" | sed "s/^${prefix}//")
         jq_path=".$(echo "$key_full" | sed 's/__/./g')"
 
-        # Inyectar según tipo de dato
-        if [[ "$value" =~ ^(true|false)$ ]] || [[ "$value" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-            jq "$jq_path = $value" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
-        elif [[ "$value" =~ ^\[.*\]$ || "$value" =~ ^\{.*\}$ ]]; then
-            # Soporte para arrays y objetos anidados complejos
-            jq "$jq_path = $value" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
+        echo "  > Inyectando $jq_path"
+
+        # Detectar tipo de dato para JQ
+        if [[ "$env_value" =~ ^(true|false)$ ]] || [[ "$env_value" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+            # Booleano o Número
+            jq "$jq_path = $env_value" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
+        elif [[ "$env_value" =~ ^\[.*\]$ || "$env_value" =~ ^\{.*\}$ ]]; then
+            # Array u Objeto JSON
+            jq "$jq_path = $env_value" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
         else
-            jq "$jq_path = \"$value\"" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
+            # String (por defecto)
+            jq "$jq_path = \"$env_value\"" "$target_file" > "${target_file}.tmp" && mv "${target_file}.tmp" "$target_file"
         fi
     done
 }
@@ -49,7 +51,6 @@ apply_configs "MAP_GEN__" "$MAP_GEN_JSON"
 apply_configs "MAP_SET__" "$MAP_SET_JSON"
 
 # --- 4. GESTIÓN DE RCON Y MAPA ---
-# (Mantenemos la lógica de RCON que ya tenemos)
 RCON_ARGS=""
 if [ "${RCON_ENABLED,,}" = "true" ]; then
     RCON_ARGS="--rcon-port ${RCON_PORT:-27015} --rcon-password ${RCON_PASSWORD:-factorio_pass}"
@@ -65,6 +66,7 @@ if [ ! -f "$SAVE_FILE" ]; then
 fi
 
 # --- 5. LANZAMIENTO ---
+echo "--- [INICIO] Arrancando servidor Factorio ---"
 exec "${CORE_PATH}/bin/x64/factorio" \
     --start-server "$SAVE_FILE" \
     --port "${PORT:-34197}" \

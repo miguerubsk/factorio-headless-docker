@@ -1,0 +1,24 @@
+services:
+  factorio:
+    container_name: factorio-server-builder
+    build:
+      context: .
+      args:
+        # Permite al usuario elegir la versión exacta al construir
+        - FACTORIO_VERSION=1.1.110
+
+    restart: unless-stopped
+
+    ports:
+      - "34197:34197/udp"
+      - "27015:27015/tcp"
+
+    environment:
+      - SAVE_NAME=builder_world
+      - RCON_ENABLED=true
+      - RCON_PASSWORD=builder_pass
+
+    volumes:
+      - ./data/saves:/factorio/saves
+      - ./data/mods:/factorio/mods
+      - ./data/config:/factorio/config
