@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MAJOR_FILTER: ${{ vars.MAJOR_FILTER || '2.0|1.1' }} 
+  MAJOR_FILTER: ${{ vars.MAJOR_FILTER || '^1\.' }} 
 
 jobs:
   check-versions:
@@ -47,6 +47,7 @@ jobs:
       contents: write # CRÍTICO: Necesario para crear la Release y subir archivos
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         version: ${{ fromJson(needs.check-versions.outputs.new_versions) }}
     steps:
