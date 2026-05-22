@@ -43,12 +43,21 @@ jobs:
     needs: check-versions
     if: ${{ needs.check-versions.outputs.new_versions != '[]' && needs.check-versions.outputs.new_versions != '' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # CRÍTICO: Necesario para crear la Release y subir archivos
     strategy:
       matrix:
         version: ${{ fromJson(needs.check-versions.outputs.new_versions) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Determine if Latest
+        id: info
+        run: |
+          # Extraemos la versión más alta del array original para el tag 'latest'
+          HIGHEST_VERSION=$(echo '${{ needs.check-versions.outputs.new_versions }}' | jq -r '.[-1]')
+          echo "highest=$HIGHEST_VERSION" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -62,34 +71,45 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build and Push (a Docker Hub) + Export (a archivo local)
-      # Nota: Exportamos solo la versión amd64 para la release de GitHub para no generar archivos gigantescos, 
-      # pero mantenemos el push multi-arch a Docker Hub.
-      - name: Build and Export Image
+      # 1. PUSH MULTI-ARCH A DOCKER HUB
+      - name: Build and Push (Multi-arch)
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           build-args: FACTORIO_VERSION=${{ matrix.version }}
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}
+            ${{ matrix.version == steps.info.outputs.highest && format('{0}/factorio-headless:latest', secrets.DOCKERHUB_USERNAME) || '' }}
           platforms: linux/amd64,linux/arm64
+
+      # 2. EXPORTAR TARBALL (Solo amd64 para evitar error de manifest list)
+      - name: Build and Export Tarball (amd64 only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          build-args: FACTORIO_VERSION=${{ matrix.version }}
+          tags: factorio-export:${{ matrix.version }}
+          platforms: linux/amd64
           outputs: type=docker,dest=/tmp/factorio-headless-${{ matrix.version }}.tar
 
-      # Opcional: Comprimir la imagen para que la descarga sea más rápida
       - name: Compress Image
-        run: gzip /tmp/factorio-headless-${{ matrix.version }}.tar
+        run: gzip -9 /tmp/factorio-headless-${{ matrix.version }}.tar
 
+      # 3. CREAR RELEASE Y SUBIR EL ARCHIVO EXPORTADO
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ matrix.version }}
           name: Factorio Headless v${{ matrix.version }}
           body: |
-            Automated multi-arch release for version ${{ matrix.version }}.
+            Automated release for Factorio version ${{ matrix.version }}.
             
-            **Docker Image:** `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
+            **Docker Hub Image:** `${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless:${{ matrix.version }}`
             
-            *The attached `.tar.gz` file contains the linux/amd64 docker image.*
+            *The attached `.tar.gz` file contains the Docker image for linux/amd64 (loadable via `docker load`).*
           files: /tmp/factorio-headless-${{ matrix.version }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
