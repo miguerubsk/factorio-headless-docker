@@ -46,6 +46,7 @@ jobs:
     permissions:
       contents: write # CRÍTICO: Necesario para crear la Release y subir archivos
     strategy:
+      fail-fast: false
       matrix:
         version: ${{ fromJson(needs.check-versions.outputs.new_versions) }}
     steps:
