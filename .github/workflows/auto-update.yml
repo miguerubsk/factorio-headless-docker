@@ -26,7 +26,7 @@ jobs:
         id: dockerhub
         run: |
           # Manejamos el caso de que el repo no exista o esté vacío
-          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=100")
+          RESPONSE=$(curl -s "https://hub.docker.com/v2/repositories/${{ secrets.DOCKERHUB_USERNAME }}/factorio-headless/tags/?page_size=2000")
           TAGS=$(echo "$RESPONSE" | jq -r '.results[].name // empty' | jq -R . | jq -s -c . || echo "[]")
           echo "existing=$TAGS" >> $GITHUB_OUTPUT
 
