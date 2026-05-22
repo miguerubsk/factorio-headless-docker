@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  MAJOR_FILTER: ${{ vars.MAJOR_FILTER || '^1\.' }} 
+  MAJOR_FILTER: ${{ vars.MAJOR_FILTER || '^0\.' }} 
 
 jobs:
   check-versions:
